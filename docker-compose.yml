@@ -1,5 +1,3 @@
-name: dcst
-
 services:
   dcst:
     image: ghcr.io/clover-eric/dcst:latest
