@@ -2,6 +2,13 @@
 
 Docker 化的 Cloudflare 优选 IP 工具。后台持续自动测速，Web 控制台管理参数，结果 API 始终只返回当前最强的 20 个 IP。
 
+> [!TIP]
+> 国内网络可使用自建 GitHub 加速器：
+> [加速访问仓库](https://github.i3.pub/https://github.com/clover-eric/dcst) ·
+> [加速下载标准 Compose](https://github.i3.pub/https://raw.githubusercontent.com/clover-eric/dcst/main/docker-compose.yml) ·
+> [加速下载飞牛 Compose](https://github.i3.pub/https://raw.githubusercontent.com/clover-eric/dcst/main/docker-compose.fnos.yml) ·
+> [加速下载整仓 ZIP](https://github.i3.pub/https://github.com/clover-eric/dcst/archive/refs/heads/main.zip)
+
 ## 功能
 
 - 基于多流并行、慢启动预热和稳态计量的 CFST 优化引擎。
@@ -21,7 +28,7 @@ Docker 化的 Cloudflare 优选 IP 工具。后台持续自动测速，Web 控�
 ```bash
 mkdir dcst
 cd dcst
-curl -O https://raw.githubusercontent.com/clover-eric/dcst/main/docker-compose.yml
+curl -fL -O https://github.i3.pub/https://raw.githubusercontent.com/clover-eric/dcst/main/docker-compose.yml
 docker compose up -d
 ```
 
@@ -34,16 +41,65 @@ http://你的NAS或路由器IP:8080/
 如果 GHCR 镜像尚未发布，或者需要从源码构建：
 
 ```bash
-git clone https://github.com/clover-eric/dcst.git
+git clone https://github.i3.pub/https://github.com/clover-eric/dcst.git
 cd dcst
 docker compose up -d --build
 ```
+
+也可以使用国内加速安装脚本，一次性下载源码、构建并启动：
+
+```bash
+curl -fL \
+  https://github.i3.pub/https://raw.githubusercontent.com/clover-eric/dcst/main/scripts/install-cn.sh \
+  -o install-cn.sh
+bash install-cn.sh
+```
+
+自定义安装目录：
+
+```bash
+DCST_INSTALL_DIR=/vol1/1000/docker/dcst bash install-cn.sh
+```
+
+`i3.pub` 加速 GitHub 仓库、Raw 文件和源码包，但不代理 GHCR。GHCR 拉取较慢时，可先按上面的加速方式下载源码并执行 `docker compose up -d --build`，或者把 `DCST_IMAGE` 改成自己的 GHCR 镜像仓库地址。
 
 默认端口是 `8080`。如需修改：
 
 ```bash
 DCST_PORT=18080 docker compose up -d
 ```
+
+## 飞牛 fnOS 专属部署
+
+仓库提供专用文件：
+
+[docker-compose.fnos.yml](https://github.i3.pub/https://raw.githubusercontent.com/clover-eric/dcst/main/docker-compose.fnos.yml)
+
+它针对飞牛做了以下调整：
+
+- 默认使用 `/vol1/1000/docker/dcst/data` 持久化配置和结果。
+- 默认端口为 `18080`，减少与 NAS 常用服务冲突。
+- `restart: always`，适合 24 小时运行。
+- 提高文件句柄上限，支持高并发测速。
+- 限制 Docker 日志为 3 × 10 MB，避免长期运行占满系统盘。
+- 非 root、只保留必要权限，并启用容器健康检查。
+
+快速步骤：
+
+1. 在飞牛文件管理器的“管理员视角”创建 `/vol1/1000/docker/dcst/data`。
+2. 打开“Docker → Compose → 新增项目”。
+3. 项目名填 `dcst`，路径选择 `/vol1/1000/docker/dcst`。
+4. 将 `docker-compose.fnos.yml` 内容粘贴到 Compose 编辑器并启动。
+5. 访问 `http://飞牛IP:18080/`。
+
+如果权限提示无法写入数据目录，在飞牛 SSH 中执行：
+
+```bash
+sudo mkdir -p /vol1/1000/docker/dcst/data
+sudo chown -R 1000:1000 /vol1/1000/docker/dcst/data
+```
+
+完整步骤见 [飞牛 NAS 部署指南](docs/fnos.md)。
 
 ## 管理员令牌
 
@@ -143,6 +199,9 @@ http://你的域名或IP:8080/result
 | `USE_IPV6` | `true` | 是否包含 IPv6 |
 | `RUN_ON_START` | `true` | 容器启动后立即测速 |
 | `ADMIN_TOKEN` | 自动生成 | 管理接口令牌 |
+| `DCST_IMAGE` | GHCR 镜像 | 可替换为国内镜像地址 |
+
+从源码构建时还可通过 `GO_IMAGE` 和 `ALPINE_IMAGE` 替换 Docker 基础镜像。
 
 Web 页面修改的配置会写入 `/data/config.json`，后续重启优先使用已保存配置。
 

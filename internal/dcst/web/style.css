@@ -233,6 +233,8 @@ input:focus {
   text-decoration: none;
 }
 
+.footer-links { display: flex; gap: 14px; }
+
 .table-wrap { overflow-x: auto; }
 
 table {

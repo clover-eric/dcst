@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
-FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
+ARG GO_IMAGE=golang:1.27-alpine
+ARG ALPINE_IMAGE=alpine:3.22
+
+FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS build
 
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
@@ -26,7 +29,7 @@ RUN GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=${TARGETVARIANT#v} \
       -ldflags="-s -w" \
       -o /out/dcst ./cmd/dcst
 
-FROM alpine:3.22
+FROM ${ALPINE_IMAGE}
 
 RUN apk add --no-cache ca-certificates tzdata && \
     addgroup -S -g 1000 dcst && \

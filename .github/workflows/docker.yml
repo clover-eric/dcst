@@ -27,6 +27,11 @@ jobs:
       - name: Test engine
         working-directory: engine
         run: go test -race ./...
+      - name: Validate deployment files
+        run: |
+          bash -n scripts/install-cn.sh
+          docker compose config >/dev/null
+          docker compose -f docker-compose.fnos.yml config >/dev/null
 
   publish:
     needs: test

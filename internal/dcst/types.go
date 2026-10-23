@@ -5,7 +5,7 @@ import "time"
 const (
 	ResultLimit  = 20
 	ServiceName  = "dcst"
-	BuildVersion = "1.0.0"
+	BuildVersion = "1.1.0"
 )
 
 type Config struct {

@@ -1,0 +1,59 @@
+# 飞牛 fnOS 专用部署文件
+#
+# 使用前请在飞牛文件管理器“管理员视角”创建：
+#   /vol1/1000/docker/dcst/data
+#
+# 如果存储池或用户 ID 不同，只需修改下方 DCST_DATA_DIR 的默认路径。
+
+services:
+  dcst:
+    image: "${DCST_IMAGE:-ghcr.io/clover-eric/dcst:latest}"
+    build:
+      context: .
+      args:
+        GO_IMAGE: "${GO_IMAGE:-golang:1.27-alpine}"
+        ALPINE_IMAGE: "${ALPINE_IMAGE:-alpine:3.22}"
+    container_name: dcst
+    restart: always
+    init: true
+    user: "1000:1000"
+    ports:
+      - "${DCST_PORT:-18080}:8080"
+    environment:
+      TZ: "Asia/Shanghai"
+      LISTEN_ADDR: ":8080"
+      INTERVAL_MINUTES: "${INTERVAL_MINUTES:-60}"
+      CANDIDATES: "${CANDIDATES:-40}"
+      STREAMS: "${STREAMS:-16}"
+      TEST_DURATION_SECONDS: "${TEST_DURATION_SECONDS:-5}"
+      WARMUP_SECONDS: "${WARMUP_SECONDS:-1}"
+      TEST_PORT: "${TEST_PORT:-443}"
+      TEST_URL: "${TEST_URL:-https://cf.xiu2.xyz/url}"
+      MIN_SPEED_MB_S: "${MIN_SPEED_MB_S:-0}"
+      MAX_LATENCY_MS: "${MAX_LATENCY_MS:-9999}"
+      MAX_LOSS_RATE: "${MAX_LOSS_RATE:-1}"
+      USE_IPV6: "${USE_IPV6:-true}"
+      RUN_ON_START: "${RUN_ON_START:-true}"
+      ADMIN_TOKEN: "${ADMIN_TOKEN:-}"
+    volumes:
+      - "${DCST_DATA_DIR:-/vol1/1000/docker/dcst/data}:/data"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3

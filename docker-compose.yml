@@ -1,8 +1,11 @@
 services:
   dcst:
-    image: ghcr.io/clover-eric/dcst:latest
+    image: "${DCST_IMAGE:-ghcr.io/clover-eric/dcst:latest}"
     build:
       context: .
+      args:
+        GO_IMAGE: "${GO_IMAGE:-golang:1.27-alpine}"
+        ALPINE_IMAGE: "${ALPINE_IMAGE:-alpine:3.22}"
     container_name: dcst
     restart: unless-stopped
     init: true
