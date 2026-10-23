@@ -1,0 +1,7 @@
+.git
+.github
+data
+*.log
+/dcst
+/cfst
+coverage.out

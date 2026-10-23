@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>DCST · Cloudflare 优选 IP</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="aurora"></div>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="DCST 首页">
+      <span class="brand-mark">D</span>
+      <span><strong>DCST</strong><small>Cloudflare Speed Test</small></span>
+    </a>
+    <div class="top-actions">
+      <span id="runBadge" class="badge pending">连接中</span>
+      <button id="refreshButton" class="button ghost" type="button">刷新</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">AUTOMATED EDGE SELECTION</p>
+        <h1>持续寻找更强的 Cloudflare 边缘节点</h1>
+        <p class="lede">自动采样、并发测速、稳态吞吐排序，仅保留当前最强的 20 个结果。</p>
+      </div>
+      <div class="hero-actions">
+        <input id="tokenInput" class="token-input" type="password" autocomplete="current-password" placeholder="管理员令牌">
+        <button id="unlockButton" class="button primary" type="button">解锁管理</button>
+        <button id="runButton" class="button accent" type="button" disabled>立即测速</button>
+      </div>
+    </section>
+
+    <section class="metrics" aria-label="运行指标">
+      <article class="metric">
+        <span>结果数量</span>
+        <strong id="resultCount">--</strong>
+        <small>固定上限 20</small>
+      </article>
+      <article class="metric">
+        <span>最高下载</span>
+        <strong id="bestSpeed">--</strong>
+        <small>MiB/s · 多流聚合</small>
+      </article>
+      <article class="metric">
+        <span>最近完成</span>
+        <strong id="lastRun">--</strong>
+        <small id="ipSource">等待首次测速</small>
+      </article>
+      <article class="metric">
+        <span>下一轮</span>
+        <strong id="nextRun">--</strong>
+        <small id="countdown">自动调度</small>
+      </article>
+    </section>
+
+    <section class="panel result-panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">LIVE RESULT API</p>
+          <h2>当前优选 IP</h2>
+        </div>
+        <div class="api-links">
+          <a href="/result" target="_blank" rel="noreferrer">/result</a>
+          <a href="/result?format=csv" target="_blank" rel="noreferrer">CSV</a>
+          <a href="/result?format=text" target="_blank" rel="noreferrer">纯文本</a>
+        </div>
+      </div>
+      <div id="errorBanner" class="error-banner" hidden></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>IP</th>
+              <th>下载速度</th>
+              <th>平均延迟</th>
+              <th>丢包率</th>
+              <th>地区</th>
+            </tr>
+          </thead>
+          <tbody id="resultBody">
+            <tr><td colspan="6" class="empty">首次测速正在准备结果…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel settings-panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">SCHEDULER</p>
+          <h2>自动化配置</h2>
+        </div>
+        <span id="adminState" class="muted">管理功能已锁定</span>
+      </div>
+      <form id="configForm">
+        <div class="form-grid">
+          <label>测速间隔（分钟）
+            <input name="interval_minutes" type="number" min="5" max="10080" required>
+          </label>
+          <label>候选 IP 数量
+            <input name="candidates" type="number" min="20" max="500" required>
+          </label>
+          <label>并发流数量
+            <input name="streams" type="number" min="1" max="64" required>
+          </label>
+          <label>单 IP 测试（秒）
+            <input name="test_duration_seconds" type="number" min="3" max="60" required>
+          </label>
+          <label>慢启动预热（秒）
+            <input name="warmup_seconds" type="number" min="0" max="10" required>
+          </label>
+          <label>测试端口
+            <input name="test_port" type="number" min="1" max="65535" required>
+          </label>
+          <label>最大延迟（ms）
+            <input name="max_latency_ms" type="number" min="1" max="9999" required>
+          </label>
+          <label>最大丢包率（0–1）
+            <input name="max_loss_rate" type="number" min="0" max="1" step="0.01" required>
+          </label>
+          <label>最低下载速度（MB/s）
+            <input name="min_speed_mb_s" type="number" min="0" step="0.01" required>
+          </label>
+          <label class="wide">测速地址
+            <input name="test_url" type="url" required>
+          </label>
+          <label class="check wide">
+            <input name="use_ipv6" type="checkbox">
+            同时测试 IPv6
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="button primary" type="submit" disabled>保存配置</button>
+          <span id="saveMessage" class="muted"></span>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <footer>
+    <span>DCST · Docker 化 Cloudflare 优选</span>
+    <a href="/health" target="_blank" rel="noreferrer">健康检查</a>
+  </footer>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

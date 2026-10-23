@@ -1,0 +1,7 @@
+.env
+data/
+/dcst
+/cfst
+*.log
+coverage.out
+.DS_Store

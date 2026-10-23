@@ -1,0 +1,44 @@
+name: dcst
+
+services:
+  dcst:
+    image: ghcr.io/clover-eric/dcst:latest
+    build:
+      context: .
+    container_name: dcst
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${DCST_PORT:-8080}:8080"
+    environment:
+      TZ: "${TZ:-Asia/Shanghai}"
+      LISTEN_ADDR: ":8080"
+      INTERVAL_MINUTES: "${INTERVAL_MINUTES:-60}"
+      CANDIDATES: "${CANDIDATES:-40}"
+      STREAMS: "${STREAMS:-16}"
+      TEST_DURATION_SECONDS: "${TEST_DURATION_SECONDS:-5}"
+      WARMUP_SECONDS: "${WARMUP_SECONDS:-1}"
+      TEST_PORT: "${TEST_PORT:-443}"
+      TEST_URL: "${TEST_URL:-https://cf.xiu2.xyz/url}"
+      MIN_SPEED_MB_S: "${MIN_SPEED_MB_S:-0}"
+      MAX_LATENCY_MS: "${MAX_LATENCY_MS:-9999}"
+      MAX_LOSS_RATE: "${MAX_LOSS_RATE:-1}"
+      USE_IPV6: "${USE_IPV6:-true}"
+      RUN_ON_START: "${RUN_ON_START:-true}"
+      ADMIN_TOKEN: "${ADMIN_TOKEN:-}"
+    volumes:
+      - dcst-data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+volumes:
+  dcst-data:
