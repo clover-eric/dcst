@@ -51,21 +51,29 @@ DCST_PORT: "10124"
 
 也可以将 Compose 中的 `${DCST_PORT:-10123}:10123` 直接改成其他宿主机端口；冒号右侧的容器端口需要与容器的监听端口保持一致。
 
-## 5. 获取管理员令牌
+## 5. 初始化管理员密码
 
-未设置 `ADMIN_TOKEN` 时，首次运行会自动生成令牌：
-
-```bash
-docker logs dcst 2>&1 | grep "管理员令牌"
-```
-
-令牌会保存在：
+首次打开：
 
 ```text
-/vol1/1000/docker/dcst/data/admin_token
+http://飞牛IP:10123/
 ```
 
-登录 Web 页面后可以手动测速和修改配置。`/result` 结果 API 是公开只读接口。
+页面会自动显示初始化窗口。设置一个 8 位纯数字密码并再次确认，完成后会自动
+登录管理界面。密码不会保存明文，哈希文件位于：
+
+```text
+/vol1/1000/docker/dcst/data/auth.json
+```
+
+登录后可以手动测速、修改参数、修改密码，也可以点击“检查并更新”触发容器
+在线升级。`/result` 结果 API 始终是公开只读接口。
+
+建议在首次初始化完成前，不要将管理页面直接暴露到公网。
+
+一键升级由 `dcst-updater` 辅助容器完成。该容器只在 Docker 内部网络提供更新
+接口，不需要映射到宿主机端口；它需要读取 `/var/run/docker.sock`，请不要把
+Docker Socket 或 `UPDATE_API_TOKEN` 暴露给外部网络。
 
 ## 6. 国内网络与镜像拉取
 
@@ -129,4 +137,4 @@ docker compose up -d
 docker compose -f docker-compose.fnos.yml up -d --build
 ```
 
-配置、结果和管理员令牌均保存在数据目录中，更新镜像不会丢失。
+配置、结果和管理员密码哈希均保存在数据目录中，更新镜像不会丢失。

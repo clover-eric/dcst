@@ -13,6 +13,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 html { background: var(--bg); }
 
@@ -284,6 +285,57 @@ label.check input { width: 18px; min-height: 18px; }
 
 .form-actions { margin-top: 20px; }
 .muted { color: var(--muted); font-size: 12px; }
+
+.modal-backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(1, 7, 5, 0.78);
+  backdrop-filter: blur(12px);
+}
+
+.auth-modal {
+  position: relative;
+  width: min(440px, 100%);
+  padding: 28px;
+  border: 1px solid rgba(102, 255, 194, 0.24);
+  border-radius: 20px;
+  background: #0b1a15;
+  box-shadow: 0 28px 100px rgba(0, 0, 0, 0.55);
+}
+
+.modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--panel-border);
+  border-radius: 50%;
+  color: var(--muted);
+  background: transparent;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.modal-description { margin-bottom: 20px; line-height: 1.65; }
+.auth-form { display: grid; gap: 15px; margin-top: 20px; }
+.wide-button { width: 100%; margin-top: 5px; }
+.auth-error {
+  margin: 16px 0 0;
+  color: var(--red);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+input.password-input {
+  font: 700 21px/1 var(--mono);
+  letter-spacing: 0.25em;
+  text-align: center;
+}
 
 .error-banner {
   margin-bottom: 16px;

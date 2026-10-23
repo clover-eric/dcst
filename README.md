@@ -18,7 +18,9 @@ Docker 化的 Cloudflare 优选 IP 工具。后台持续自动测速，Web 控�
 - 自动适配 `linux/amd64`、`linux/arm64`、`linux/arm/v7`。
 - 测量更多候选后，只持久化和公开按下载吞吐排序的前 20 个 IP。
 - 内置响应式 Web 管理页、手动测速和参数修改。
-- 管理接口使用独立令牌；公开结果 API 只读。
+- 首次访问设置 8 位数字管理员密码；密码使用 bcrypt 哈希保存。
+- Web 管理使用 HttpOnly 会话，修改密码后旧会话自动失效。
+- Web 管理页支持一键拉取最新镜像并自动重建容器。
 - 配置和结果存放在 Docker 数据卷中，重启不丢失。
 
 ## 快速部署
@@ -101,22 +103,28 @@ sudo chown -R 1000:1000 /vol1/1000/docker/dcst/data
 
 完整步骤见 [飞牛 NAS 部署指南](docs/fnos.md)。
 
-## 管理员令牌
+## 管理员密码
 
-未设置 `ADMIN_TOKEN` 时，首次启动会生成随机令牌并输出到日志：
+首次部署后打开 Web 页面，会显示初始化窗口：
 
-```bash
-docker logs dcst 2>&1 | grep "管理员令牌"
-```
+1. 设置一个 **8 位纯数字密码**；
+2. 再次输入确认；
+3. 初始化完成后自动登录管理界面。
 
-也可以在 Compose 中固定：
+密码要求：
 
-```yaml
-environment:
-  ADMIN_TOKEN: "请替换为足够长的随机字符串"
-```
+- 必须正好 8 位；
+- 只能包含数字；
+- 禁止 8 位完全相同或明显的连续数字序列；
+- 连续登录失败会触发 5 分钟限流。
 
-令牌用于“立即测速”和修改配置。查看结果与 Web 首页不需要令牌。
+密码经过 bcrypt 哈希后保存到 `/data/auth.json`，不会保存明文。登录状态使用
+24 小时 HttpOnly 会话 Cookie。登录后可在配置区域点击“修改密码”，修改成功后
+其他旧会话全部失效。
+
+首次初始化前不要把未初始化的管理页面直接暴露到公网。升级自旧版本的用户首次
+打开页面同样需要设置密码；为了兼容已有自动化脚本，显式设置 `ADMIN_TOKEN` 时
+仍允许通过 Bearer Token 调用管理 API，但 Web 管理不再要求或展示令牌。
 
 ## 结果 API
 
@@ -167,8 +175,14 @@ http://你的域名或IP:10123/result
 | `/result?format=text` | GET | 每行一个 IP |
 | `/api/status` | GET | 当前运行状态 |
 | `/api/config` | GET | 当前配置 |
-| `/api/config` | POST | 修改配置，需要管理员令牌 |
-| `/api/run` | POST | 立即测速，需要管理员令牌 |
+| `/api/config` | POST | 修改配置，需要管理员登录 |
+| `/api/run` | POST | 立即测速，需要管理员登录 |
+| `/api/auth/status` | GET | 密码是否初始化及当前登录状态 |
+| `/api/setup` | POST | 首次设置密码 |
+| `/api/login` | POST | 密码登录 |
+| `/api/logout` | POST | 退出登录 |
+| `/api/password` | POST | 修改密码 |
+| `/api/update` | POST | 一键更新容器，需要管理员登录 |
 | `/health` | GET | 容器健康检查 |
 
 ## 排序规则
@@ -198,10 +212,31 @@ http://你的域名或IP:10123/result
 | `MAX_LOSS_RATE` | `1` | 最大丢包率，范围 0–1 |
 | `USE_IPV6` | `true` | 是否包含 IPv6 |
 | `RUN_ON_START` | `true` | 容器启动后立即测速 |
-| `ADMIN_TOKEN` | 自动生成 | 管理接口令牌 |
+| `ADMIN_TOKEN` | 未设置 | 可选的旧版管理 API 兼容令牌 |
 | `DCST_IMAGE` | GHCR 镜像 | 可替换为国内镜像地址 |
+| `UPDATE_API_TOKEN` | 内部默认值 | DCST 与更新代理之间的内部令牌 |
+| `WATCHTOWER_IMAGE` | `nickfedor/watchtower:1.23.2` | 一键更新代理镜像 |
 
 从源码构建时还可通过 `GO_IMAGE` 和 `ALPINE_IMAGE` 替换 Docker 基础镜像。
+
+## 一键在线更新
+
+Compose 中内置了独立的 `updater` 服务，使用活跃维护的
+`nickfedor/watchtower`。登录 Web 管理后点击“检查并更新”：
+
+1. DCST 通过内部网络调用更新代理；
+2. 更新代理拉取当前容器使用的镜像标签；
+3. 有新镜像时自动重建 DCST 容器；
+4. 密码、配置和测速结果都保存在 `/data` 中，不会丢失。
+
+更新代理没有对宿主机开放端口，且只处理带有
+`com.centurylinklabs.watchtower.enable=true` 标签的 DCST 容器。它需要访问
+`/var/run/docker.sock`，属于容器管理的高权限能力，因此建议保持内部网络隔离，
+并修改默认 `UPDATE_API_TOKEN`。
+
+从 `v1.1.x` 升级到 `v1.2.x` 时，需要先使用新版 `docker-compose.yml` 重新创建
+一次项目，因为旧镜像本身还没有 Web 更新接口，也无法自带更新代理。升级到
+`v1.2.0` 后，后续版本即可直接使用页面上的“检查并更新”按钮。
 
 Web 页面修改的配置会写入 `/data/config.json`，后续重启优先使用已保存配置。
 
@@ -230,7 +265,8 @@ location / {
 }
 ```
 
-如果 Web 管理端暴露到公网，请务必设置强随机 `ADMIN_TOKEN`，并建议在外层增加访问控制。
+如果 Web 管理端暴露到公网，请先完成密码初始化并设置不易猜测的 8 位数字密码，
+同时建议在反向代理外层增加 IP 白名单、身份认证或其他访问控制。
 
 ## 数据与升级
 
@@ -244,7 +280,8 @@ docker compose up -d
 ```text
 /data/config.json
 /data/result.json
-/data/admin_token
+/data/auth.json
+/data/admin_token  # 仅旧版兼容令牌存在时
 ```
 
 备份该卷即可完整保存配置与结果。

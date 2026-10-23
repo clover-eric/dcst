@@ -5,7 +5,7 @@ import "time"
 const (
 	ResultLimit  = 20
 	ServiceName  = "dcst"
-	BuildVersion = "1.1.1"
+	BuildVersion = "1.2.0"
 )
 
 type Config struct {
@@ -33,20 +33,27 @@ type IPResult struct {
 }
 
 type Snapshot struct {
-	Ready       bool       `json:"ready"`
-	Running     bool       `json:"running"`
-	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
-	LastRunAt   *time.Time `json:"last_run_at,omitempty"`
-	NextRunAt   *time.Time `json:"next_run_at,omitempty"`
-	LastError   string     `json:"last_error,omitempty"`
-	IPSource    string     `json:"ip_source,omitempty"`
-	Count       int        `json:"count"`
-	Candidates  int        `json:"candidates"`
-	Results     []IPResult `json:"results"`
-	AdminAuth   bool       `json:"admin_auth"`
-	Service     string     `json:"service"`
-	Version     string     `json:"version"`
-	IntervalMin int        `json:"interval_minutes"`
+	Ready         bool       `json:"ready"`
+	Running       bool       `json:"running"`
+	UpdatedAt     *time.Time `json:"updated_at,omitempty"`
+	LastRunAt     *time.Time `json:"last_run_at,omitempty"`
+	NextRunAt     *time.Time `json:"next_run_at,omitempty"`
+	LastError     string     `json:"last_error,omitempty"`
+	IPSource      string     `json:"ip_source,omitempty"`
+	Count         int        `json:"count"`
+	Candidates    int        `json:"candidates"`
+	Results       []IPResult `json:"results"`
+	AdminAuth     bool       `json:"admin_auth"`
+	UpdateEnabled bool       `json:"update_enabled"`
+	Service       string     `json:"service"`
+	Version       string     `json:"version"`
+	IntervalMin   int        `json:"interval_minutes"`
+}
+
+type AuthStatus struct {
+	Initialized   bool   `json:"initialized"`
+	Authenticated bool   `json:"authenticated"`
+	PasswordRule  string `json:"password_rule"`
 }
 
 type runnerState struct {

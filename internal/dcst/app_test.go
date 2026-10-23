@@ -174,3 +174,133 @@ func TestResultAPIAndAdminAuth(t *testing.T) {
 		t.Fatalf("authorized status = %d", authorizedRec.Code)
 	}
 }
+
+func TestPasswordSetupLoginAndChange(t *testing.T) {
+	t.Setenv("ADMIN_TOKEN", "")
+	t.Setenv("RUN_ON_START", "false")
+	dataDir := t.TempDir()
+	app, err := NewApp(dataDir, "/bin/true", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := NewHandler(app)
+
+	statusReq := httptest.NewRequest(http.MethodGet, "/api/auth/status", nil)
+	statusRec := httptest.NewRecorder()
+	handler.ServeHTTP(statusRec, statusReq)
+	if statusRec.Code != http.StatusOK {
+		t.Fatalf("auth status = %d", statusRec.Code)
+	}
+	var status AuthStatus
+	if err := json.Unmarshal(statusRec.Body.Bytes(), &status); err != nil {
+		t.Fatal(err)
+	}
+	if status.Initialized {
+		t.Fatal("new app should require password setup")
+	}
+
+	setupBody := bytes.NewBufferString(`{"password":"12345670","confirm":"12345670"}`)
+	setupReq := httptest.NewRequest(http.MethodPost, "/api/setup", setupBody)
+	setupReq.RemoteAddr = "127.0.0.1:10000"
+	setupRec := httptest.NewRecorder()
+	handler.ServeHTTP(setupRec, setupReq)
+	if setupRec.Code != http.StatusNoContent {
+		t.Fatalf("setup status = %d body=%s", setupRec.Code, setupRec.Body.String())
+	}
+	authFile, err := os.ReadFile(filepath.Join(dataDir, "auth.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(authFile, []byte("12345670")) {
+		t.Fatal("auth file must not contain the plaintext password")
+	}
+	cookies := setupRec.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("setup did not set session cookie")
+	}
+
+	loginBody := bytes.NewBufferString(`{"password":"12345670"}`)
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/login", loginBody)
+	loginReq.RemoteAddr = "127.0.0.1:10001"
+	loginRec := httptest.NewRecorder()
+	handler.ServeHTTP(loginRec, loginReq)
+	if loginRec.Code != http.StatusNoContent {
+		t.Fatalf("login status = %d body=%s", loginRec.Code, loginRec.Body.String())
+	}
+	loginCookies := loginRec.Result().Cookies()
+	if len(loginCookies) == 0 {
+		t.Fatal("login did not set session cookie")
+	}
+
+	changeBody := bytes.NewBufferString(`{"current":"12345670","password":"76543210","confirm":"76543210"}`)
+	changeReq := httptest.NewRequest(http.MethodPost, "/api/password", changeBody)
+	changeReq.RemoteAddr = "127.0.0.1:10002"
+	changeReq.AddCookie(loginCookies[0])
+	changeRec := httptest.NewRecorder()
+	handler.ServeHTTP(changeRec, changeReq)
+	if changeRec.Code != http.StatusNoContent {
+		t.Fatalf("change password status = %d body=%s", changeRec.Code, changeRec.Body.String())
+	}
+
+	statusReq = httptest.NewRequest(http.MethodGet, "/api/auth/status", nil)
+	statusReq.AddCookie(changeRec.Result().Cookies()[0])
+	statusRec = httptest.NewRecorder()
+	handler.ServeHTTP(statusRec, statusReq)
+	status = AuthStatus{}
+	if err := json.Unmarshal(statusRec.Body.Bytes(), &status); err != nil {
+		t.Fatal(err)
+	}
+	if !status.Initialized || !status.Authenticated {
+		t.Fatalf("unexpected auth status after password change: %+v", status)
+	}
+
+	restarted, err := NewApp(dataDir, "/bin/true", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !restarted.PasswordConfigured() {
+		t.Fatal("password should persist across app restart")
+	}
+	if _, err := restarted.Login("76543210", "127.0.0.1"); err != nil {
+		t.Fatalf("login after restart failed: %v", err)
+	}
+}
+
+func TestPasswordValidation(t *testing.T) {
+	for _, password := range []string{"1234567", "123456789", "1234567a", "88888888", "12345678"} {
+		if err := validatePassword(password); err == nil {
+			t.Fatalf("password %q should be rejected", password)
+		}
+	}
+	if err := validatePassword("48261937"); err != nil {
+		t.Fatalf("valid password rejected: %v", err)
+	}
+}
+
+func TestRequestUpdateCallsInternalUpdater(t *testing.T) {
+	var gotAuthorization string
+	updater := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuthorization = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"status":"accepted"}`))
+	}))
+	defer updater.Close()
+
+	t.Setenv("ADMIN_TOKEN", "")
+	t.Setenv("RUN_ON_START", "false")
+	t.Setenv("UPDATE_ENDPOINT", updater.URL)
+	t.Setenv("UPDATE_TOKEN", "updater-token")
+	app, err := NewApp(t.TempDir(), "/bin/true", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := app.RequestUpdate(); err != nil {
+		t.Fatal(err)
+	}
+	if gotAuthorization != "Bearer updater-token" {
+		t.Fatalf("authorization = %q", gotAuthorization)
+	}
+	if !app.Snapshot().UpdateEnabled {
+		t.Fatal("snapshot should report update support")
+	}
+}

@@ -29,8 +29,14 @@ func NewHandler(app *App) http.Handler {
 	mux.HandleFunc("/health", server.health)
 	mux.HandleFunc("/api/status", server.status)
 	mux.HandleFunc("/api/config", server.config)
+	mux.HandleFunc("/api/auth/status", server.authStatus)
 	mux.HandleFunc("/api/auth", server.auth)
+	mux.HandleFunc("/api/setup", server.setup)
+	mux.HandleFunc("/api/login", server.login)
+	mux.HandleFunc("/api/logout", server.logout)
+	mux.HandleFunc("/api/password", server.password)
 	mux.HandleFunc("/api/run", server.run)
+	mux.HandleFunc("/api/update", server.update)
 	mux.HandleFunc("/result", server.result)
 	mux.HandleFunc("/api/result", server.result)
 	return securityHeaders(mux)
@@ -115,6 +121,110 @@ func (s *Server) auth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *Server) authStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, http.MethodGet)
+		return
+	}
+	writeJSON(w, http.StatusOK, s.app.AuthStatus(r))
+}
+
+type passwordRequest struct {
+	Password string `json:"password"`
+	Confirm  string `json:"confirm"`
+	Current  string `json:"current"`
+}
+
+func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, http.MethodPost)
+		return
+	}
+	var payload passwordRequest
+	if !decodePasswordRequest(w, r, &payload) {
+		return
+	}
+	token, err := s.app.SetupPassword(payload.Password, payload.Confirm)
+	if err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, ErrAlreadyInitialized) {
+			status = http.StatusConflict
+		}
+		writeError(w, status, err.Error())
+		return
+	}
+	s.app.SetSessionCookie(w, r, token)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, http.MethodPost)
+		return
+	}
+	var payload passwordRequest
+	if !decodePasswordRequest(w, r, &payload) {
+		return
+	}
+	token, err := s.app.Login(payload.Password, clientIP(r))
+	if err != nil {
+		status := http.StatusUnauthorized
+		if errors.Is(err, ErrNotInitialized) {
+			status = http.StatusConflict
+		}
+		writeError(w, status, err.Error())
+		return
+	}
+	s.app.SetSessionCookie(w, r, token)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, http.MethodPost)
+		return
+	}
+	s.app.Logout(r)
+	s.app.ClearSessionCookie(w)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) password(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, http.MethodPost)
+		return
+	}
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	var payload passwordRequest
+	if !decodePasswordRequest(w, r, &payload) {
+		return
+	}
+	token, err := s.app.ChangePassword(payload.Current, payload.Password, payload.Confirm)
+	if err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, ErrInvalidPassword) {
+			status = http.StatusUnauthorized
+		}
+		writeError(w, status, err.Error())
+		return
+	}
+	s.app.SetSessionCookie(w, r, token)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func decodePasswordRequest(w http.ResponseWriter, r *http.Request, target *passwordRequest) bool {
+	defer r.Body.Close()
+	decoder := json.NewDecoder(io.LimitReader(r.Body, 16<<10))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return false
+	}
+	return true
+}
+
 func (s *Server) run(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		methodNotAllowed(w, http.MethodPost)
@@ -134,6 +244,28 @@ func (s *Server) run(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"accepted": true,
 		"message":  "测速任务已启动",
+	})
+}
+
+func (s *Server) update(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, http.MethodPost)
+		return
+	}
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	if err := s.app.RequestUpdate(); err != nil {
+		status := http.StatusBadGateway
+		if errors.Is(err, ErrUpdateUnavailable) {
+			status = http.StatusServiceUnavailable
+		}
+		writeError(w, status, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"accepted": true,
+		"message":  "更新已触发，容器可能在十几秒后自动重启",
 	})
 }
 
@@ -190,12 +322,8 @@ func writeResultCSV(w http.ResponseWriter, snapshot Snapshot) {
 }
 
 func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
-	header := r.Header.Get("Authorization")
-	if header == "" {
-		header = r.Header.Get("X-Admin-Token")
-	}
-	if !s.app.authorized(header) {
-		writeError(w, http.StatusUnauthorized, "管理员令牌无效")
+	if !s.app.Authenticated(r) {
+		writeError(w, http.StatusUnauthorized, "管理登录已失效")
 		return false
 	}
 	return true

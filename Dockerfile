@@ -13,8 +13,9 @@ ENV CGO_ENABLED=0
 WORKDIR /src
 
 COPY engine/go.mod engine/go.sum ./engine/
-COPY go.mod ./
-RUN cd /src/engine && go mod download
+COPY go.mod go.sum ./
+RUN cd /src/engine && go mod download && \
+    cd /src && go mod download
 
 COPY . .
 

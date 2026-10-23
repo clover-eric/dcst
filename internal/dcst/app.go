@@ -3,9 +3,6 @@ package dcst
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"crypto/subtle"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,14 +26,23 @@ type App struct {
 	enginePath string
 	logger     *slog.Logger
 
-	configPath string
-	resultPath string
-	adminToken string
-	runOnStart bool
-	jobTimeout time.Duration
+	configPath     string
+	resultPath     string
+	authPath       string
+	runOnStart     bool
+	jobTimeout     time.Duration
+	updateEndpoint string
+	updateToken    string
 
 	configMu sync.RWMutex
 	config   Config
+
+	authMu             sync.RWMutex
+	passwordHash       []byte
+	passwordConfigured bool
+	sessions           map[string]time.Time
+	loginAttempts      map[string]*loginAttempt
+	legacyAdminToken   string
 
 	stateMu sync.RWMutex
 	state   runnerState
@@ -57,14 +63,19 @@ func NewApp(dataDir, enginePath string, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 	app := &App{
-		dataDir:      dataDir,
-		enginePath:   enginePath,
-		logger:       logger,
-		configPath:   filepath.Join(dataDir, "config.json"),
-		resultPath:   filepath.Join(dataDir, "result.json"),
-		runOnStart:   envBool("RUN_ON_START", true),
-		jobTimeout:   time.Duration(envInt("JOB_TIMEOUT_MINUTES", 30)) * time.Minute,
-		scheduleWake: make(chan struct{}, 1),
+		dataDir:        dataDir,
+		enginePath:     enginePath,
+		logger:         logger,
+		configPath:     filepath.Join(dataDir, "config.json"),
+		resultPath:     filepath.Join(dataDir, "result.json"),
+		authPath:       filepath.Join(dataDir, "auth.json"),
+		runOnStart:     envBool("RUN_ON_START", true),
+		jobTimeout:     time.Duration(envInt("JOB_TIMEOUT_MINUTES", 30)) * time.Minute,
+		updateEndpoint: strings.TrimSpace(os.Getenv("UPDATE_ENDPOINT")),
+		updateToken:    strings.TrimSpace(os.Getenv("UPDATE_TOKEN")),
+		scheduleWake:   make(chan struct{}, 1),
+		sessions:       make(map[string]time.Time),
+		loginAttempts:  make(map[string]*loginAttempt),
 	}
 	if app.jobTimeout < 5*time.Minute {
 		app.jobTimeout = 30 * time.Minute
@@ -83,11 +94,10 @@ func NewApp(dataDir, enginePath string, logger *slog.Logger) (*App, error) {
 	}
 	app.config = cfg
 
-	token, err := app.loadOrCreateAdminToken()
-	if err != nil {
+	if err := app.loadPasswordRecord(); err != nil {
 		return nil, err
 	}
-	app.adminToken = token
+	app.legacyAdminToken = app.loadLegacyAdminToken()
 
 	app.state = runnerState{Results: []IPResult{}}
 	if data, readErr := os.ReadFile(app.resultPath); readErr == nil {
@@ -140,20 +150,21 @@ func (a *App) Snapshot() Snapshot {
 		nextPtr = &value
 	}
 	return Snapshot{
-		Ready:       state.Ready,
-		Running:     a.running.Load(),
-		UpdatedAt:   state.UpdatedAt,
-		LastRunAt:   state.LastRunAt,
-		NextRunAt:   nextPtr,
-		LastError:   state.LastError,
-		IPSource:    state.IPSource,
-		Count:       len(state.Results),
-		Candidates:  state.Candidates,
-		Results:     state.Results,
-		AdminAuth:   true,
-		Service:     ServiceName,
-		Version:     BuildVersion,
-		IntervalMin: cfg.IntervalMinutes,
+		Ready:         state.Ready,
+		Running:       a.running.Load(),
+		UpdatedAt:     state.UpdatedAt,
+		LastRunAt:     state.LastRunAt,
+		NextRunAt:     nextPtr,
+		LastError:     state.LastError,
+		IPSource:      state.IPSource,
+		Count:         len(state.Results),
+		Candidates:    state.Candidates,
+		Results:       state.Results,
+		AdminAuth:     true,
+		UpdateEnabled: a.updateEndpoint != "",
+		Service:       ServiceName,
+		Version:       BuildVersion,
+		IntervalMin:   cfg.IntervalMinutes,
 	}
 }
 
@@ -281,38 +292,15 @@ func (a *App) notifyScheduler() {
 	}
 }
 
-func (a *App) authorized(header string) bool {
-	const prefix = "Bearer "
-	token := strings.TrimSpace(header)
-	if strings.HasPrefix(token, prefix) {
-		token = strings.TrimSpace(strings.TrimPrefix(token, prefix))
-	}
-	if token == "" || a.adminToken == "" {
-		return false
-	}
-	return subtle.ConstantTimeCompare([]byte(token), []byte(a.adminToken)) == 1
-}
-
-func (a *App) loadOrCreateAdminToken() (string, error) {
+func (a *App) loadLegacyAdminToken() string {
 	if token := strings.TrimSpace(os.Getenv("ADMIN_TOKEN")); token != "" {
-		return token, nil
+		return token
 	}
 	tokenPath := filepath.Join(a.dataDir, "admin_token")
 	if data, err := os.ReadFile(tokenPath); err == nil {
-		if token := strings.TrimSpace(string(data)); token != "" {
-			return token, nil
-		}
+		return strings.TrimSpace(string(data))
 	}
-	randomBytes := make([]byte, 24)
-	if _, err := rand.Read(randomBytes); err != nil {
-		return "", err
-	}
-	token := base64.RawURLEncoding.EncodeToString(randomBytes)
-	if err := os.WriteFile(tokenPath, []byte(token+"\n"), 0o600); err != nil {
-		return "", err
-	}
-	a.logger.Warn("已生成管理员令牌，请妥善保存", "token", token, "file", tokenPath)
-	return token, nil
+	return ""
 }
 
 type limitedBuffer struct {

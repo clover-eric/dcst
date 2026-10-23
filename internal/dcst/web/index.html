@@ -28,8 +28,8 @@
         <p class="lede">自动采样、并发测速、稳态吞吐排序，仅保留当前最强的 20 个结果。</p>
       </div>
       <div class="hero-actions">
-        <input id="tokenInput" class="token-input" type="password" autocomplete="current-password" placeholder="管理员令牌">
-        <button id="unlockButton" class="button primary" type="button">解锁管理</button>
+        <button id="unlockButton" class="button primary" type="button">登录管理</button>
+        <button id="logoutButton" class="button ghost" type="button" hidden>退出登录</button>
         <button id="runButton" class="button accent" type="button" disabled>立即测速</button>
       </div>
     </section>
@@ -136,6 +136,8 @@
         </div>
         <div class="form-actions">
           <button class="button primary" type="submit" disabled>保存配置</button>
+          <button id="passwordButton" class="button" type="button" disabled>修改密码</button>
+          <button id="updateButton" class="button accent" type="button" disabled hidden>检查并更新</button>
           <span id="saveMessage" class="muted"></span>
         </div>
       </form>
@@ -149,6 +151,46 @@
       <a href="/health" target="_blank" rel="noreferrer">健康检查</a>
     </span>
   </footer>
+
+  <div id="authModal" class="modal-backdrop" hidden>
+    <section class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <button id="authCloseButton" class="modal-close" type="button" aria-label="关闭">×</button>
+      <p class="eyebrow" id="authEyebrow">ADMIN ACCESS</p>
+      <h2 id="authTitle">登录管理</h2>
+      <p id="authDescription" class="muted modal-description"></p>
+
+      <form id="setupForm" class="auth-form" hidden>
+        <label>设置 8 位数字密码
+          <input id="setupPassword" class="password-input" type="password" inputmode="numeric" pattern="[0-9]{8}" minlength="8" maxlength="8" autocomplete="new-password" required>
+        </label>
+        <label>再次输入密码
+          <input id="setupConfirm" class="password-input" type="password" inputmode="numeric" pattern="[0-9]{8}" minlength="8" maxlength="8" autocomplete="new-password" required>
+        </label>
+        <button class="button primary wide-button" type="submit">完成初始化</button>
+      </form>
+
+      <form id="loginForm" class="auth-form" hidden>
+        <label>登录密码
+          <input id="loginPassword" class="password-input" type="password" inputmode="numeric" pattern="[0-9]{8}" minlength="8" maxlength="8" autocomplete="current-password" required>
+        </label>
+        <button class="button primary wide-button" type="submit">登录</button>
+      </form>
+
+      <form id="changePasswordForm" class="auth-form" hidden>
+        <label>当前密码
+          <input id="currentPassword" class="password-input" type="password" inputmode="numeric" pattern="[0-9]{8}" minlength="8" maxlength="8" autocomplete="current-password" required>
+        </label>
+        <label>新密码
+          <input id="newPassword" class="password-input" type="password" inputmode="numeric" pattern="[0-9]{8}" minlength="8" maxlength="8" autocomplete="new-password" required>
+        </label>
+        <label>再次输入新密码
+          <input id="newPasswordConfirm" class="password-input" type="password" inputmode="numeric" pattern="[0-9]{8}" minlength="8" maxlength="8" autocomplete="new-password" required>
+        </label>
+        <button class="button primary wide-button" type="submit">更新密码</button>
+      </form>
+      <p id="authError" class="auth-error" hidden></p>
+    </section>
+  </div>
   <script src="/static/app.js" defer></script>
 </body>
 </html>
