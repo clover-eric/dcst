@@ -19,7 +19,7 @@ func main() {
 
 	dataDir := envString("DATA_DIR", "/data")
 	enginePath := envString("CFST_PATH", "/app/cfst")
-	listenAddr := envString("LISTEN_ADDR", ":8080")
+	listenAddr := envString("LISTEN_ADDR", ":10123")
 	app, err := dcst.NewApp(dataDir, enginePath, logger)
 	if err != nil {
 		logger.Error("初始化失败", "error", err)

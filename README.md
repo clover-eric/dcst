@@ -35,7 +35,7 @@ docker compose up -d
 打开：
 
 ```text
-http://你的NAS或路由器IP:8080/
+http://你的NAS或路由器IP:10123/
 ```
 
 如果 GHCR 镜像尚未发布，或者需要从源码构建：
@@ -63,10 +63,10 @@ DCST_INSTALL_DIR=/vol1/1000/docker/dcst bash install-cn.sh
 
 `i3.pub` 加速 GitHub 仓库、Raw 文件和源码包，但不代理 GHCR。GHCR 拉取较慢时，可先按上面的加速方式下载源码并执行 `docker compose up -d --build`，或者把 `DCST_IMAGE` 改成自己的 GHCR 镜像仓库地址。
 
-默认端口是 `8080`。如需修改：
+默认端口是 `10123`。如需修改：
 
 ```bash
-DCST_PORT=18080 docker compose up -d
+DCST_PORT=10124 docker compose up -d
 ```
 
 ## 飞牛 fnOS 专属部署
@@ -78,7 +78,7 @@ DCST_PORT=18080 docker compose up -d
 它针对飞牛做了以下调整：
 
 - 默认使用 `/vol1/1000/docker/dcst/data` 持久化配置和结果。
-- 默认端口为 `18080`，减少与 NAS 常用服务冲突。
+- 默认端口为 `10123`，减少与 NAS 常用服务冲突。
 - `restart: always`，适合 24 小时运行。
 - 提高文件句柄上限，支持高并发测速。
 - 限制 Docker 日志为 3 × 10 MB，避免长期运行占满系统盘。
@@ -90,7 +90,7 @@ DCST_PORT=18080 docker compose up -d
 2. 打开“Docker → Compose → 新增项目”。
 3. 项目名填 `dcst`，路径选择 `/vol1/1000/docker/dcst`。
 4. 将 `docker-compose.fnos.yml` 内容粘贴到 Compose 编辑器并启动。
-5. 访问 `http://飞牛IP:18080/`。
+5. 访问 `http://飞牛IP:10123/`。
 
 如果权限提示无法写入数据目录，在飞牛 SSH 中执行：
 
@@ -123,7 +123,7 @@ environment:
 JSON，默认接口：
 
 ```text
-http://你的域名或IP:8080/result
+http://你的域名或IP:10123/result
 ```
 
 示例：
@@ -185,7 +185,7 @@ http://你的域名或IP:8080/result
 
 | 变量 | 默认值 | 说明 |
 |---|---:|---|
-| `DCST_PORT` | `8080` | 宿主机端口 |
+| `DCST_PORT` | `10123` | 宿主机端口 |
 | `INTERVAL_MINUTES` | `60` | 自动测速间隔 |
 | `CANDIDATES` | `40` | 每轮下载测试候选数 |
 | `STREAMS` | `16` | 每候选 IP 并发连接数 |
@@ -223,7 +223,7 @@ STREAMS=16
 
 ```nginx
 location / {
-    proxy_pass http://127.0.0.1:8080;
+    proxy_pass http://127.0.0.1:10123;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;

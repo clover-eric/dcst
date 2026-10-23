@@ -43,7 +43,7 @@ COPY --from=build /out/cfst /app/cfst
 COPY engine/ip.txt engine/ipv6.txt /app/
 
 ENV DATA_DIR=/data \
-    LISTEN_ADDR=:8080 \
+    LISTEN_ADDR=:10123 \
     CFST_PATH=/app/cfst \
     BUNDLED_IP_DIR=/app \
     INTERVAL_MINUTES=60 \
@@ -60,10 +60,10 @@ ENV DATA_DIR=/data \
     RUN_ON_START=true
 
 VOLUME ["/data"]
-EXPOSE 8080
+EXPOSE 10123
 USER 1000:1000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD wget -q -O - http://127.0.0.1:8080/health >/dev/null || exit 1
+  CMD wget -q -O - http://127.0.0.1:10123/health >/dev/null || exit 1
 
 ENTRYPOINT ["/app/dcst"]

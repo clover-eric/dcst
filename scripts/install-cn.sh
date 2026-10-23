@@ -48,6 +48,6 @@ cd "$INSTALL_DIR"
 docker compose up -d --build
 
 echo
-echo "部署完成：http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo 'NAS-IP'):8080/"
+echo "部署完成：http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo 'NAS-IP'):10123/"
 echo "查看管理员令牌："
 echo "  docker logs dcst 2>&1 | grep \"管理员令牌\""
